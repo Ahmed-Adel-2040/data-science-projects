@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Feb  5 19:26:54 2020
+
+@author: ahmed-adel
+"""
+
+from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException
+from pymongo import MongoClient
+import time
+
+
+client = MongoClient()
+DB_NAME = 'udemy'
+db = client[DB_NAME]
+Development = db['development']
+lectuer_index=[0,3,6,9,12,15,18,21,24,27,30,33,36,39,42,45]
+hours_index=[1,4,7,10,13,16,19,22,25,28,31,34,37,40,43,46]
+level_index=[2,5,8,11,14,17,20,23,26,29,32,35,38,41,44,47]
+course_Name=[]
+course_Rate=[]
+course_Description=[]
+number_Of_Lectures=[]
+level_Of_Course=[]
+number_Of_Hours=[]
+Meta_Data=[]
+
+def get_Driver():
+    driver =webdriver.Firefox();
+    driver.get('https://www.udemy.com/courses/development/')
+
+    time.sleep(5)
+    return driver
+
+
+
+def get_Data(driver):
+    names=driver.find_elements_by_xpath("//div[contains(@class, 'list-view-course-card--title--2pfA0')]/h4")
+    rates=driver.find_elements_by_xpath("//div[contains(@class, 'list-view-course-card--rating--za-yU')]")
+    descriptions=driver.find_elements_by_xpath("//div[contains(@class, 'list-view-course-card--headline-and-instructor--2nbyp')]")
+    meta_Data=driver.find_elements_by_xpath("//span[contains(@class, 'list-view-course-card--meta-item--1Pyfe')]")
+
+    for element in names:
+        course_Name.append(element.text)
+
+    for element in descriptions:
+        course_Description.append(element.text)
+    
+    for element in rates:
+        course_Rate.append(element.text)
+    
+    for element in meta_Data:
+        Meta_Data.append(element.text)
+    global number_Of_Hours,level_Of_Course,number_Of_Lectures
+    number_Of_Lectures=[Meta_Data[i] for i in lectuer_index]
+    number_Of_Hours=[Meta_Data[i] for i in hours_index]
+    level_Of_Course=[Meta_Data[i] for i in level_index]
+
+                    
+    driver.find_element_by_xpath("//span[contains(@class, 'pagination-next udi udi-next')]").click()
+    time.sleep(5)
+    
+
+
+
+
+
+
+def save_To_Mongo(): 
+    for i in range(16):
+        Course={
+            'Course_Name':course_Name[i],
+            'Course_Rate':course_Rate[i],
+            'Course_Description':course_Description[i],
+            'Lectures_Num':number_Of_Lectures[i],
+            'Course_Level':level_Of_Course[i],
+            'Course_hours':number_Of_Hours[i]
+            }
+        Development.insert_one(Course)
+    print("Data Saved in Mongo DB")
+    course_Name.clear()
+    course_Rate.clear()
+    course_Description.clear()
+    number_Of_Lectures.clear()
+    level_Of_Course.clear()
+    number_Of_Hours.clear()
+    Meta_Data.clear()
+    
+if __name__=='__main__':
+    try:
+        driver=get_Driver()
+        while True:
+            get_Data(driver)
+            save_To_Mongo()
+            
+    except NoSuchElementException:
+        print('No More Page')
+        driver.close()
+        
+
+
