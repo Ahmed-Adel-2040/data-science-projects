@@ -1,0 +1,27 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Sat Feb  1 23:50:14 2020
+
+@author: ahmed-adel
+"""
+from autocorrect import spell
+#convert list to dataframe
+import pandas as pd
+from textblob import TextBlob
+
+# Let’s create a list of strings and assign it to a variable.
+text = ['This is introduction to NLP',
+        'It is likely to be useful, to people ',
+        'Machine learning is the new electrcity', 
+        'There would be less hype around AI and more action going forward',
+        'python is the best tool!',
+        'R is good langauage',
+        'I like this book',
+        'I want more books like this']
+
+
+df = pd.DataFrame({'tweet':text})
+
+words=TextBlob(df['tweet'][3]).words
+print(spell(u' mussage')) 
