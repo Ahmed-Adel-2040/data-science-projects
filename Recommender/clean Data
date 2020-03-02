@@ -1,0 +1,246 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Sat Feb  1 12:41:53 2020
+
+@author: ahmed-adel
+"""
+
+import requests
+import json
+from bs4 import BeautifulSoup
+import re 
+from selenium import webdriver
+from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.wait import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import pandas as pd
+from pymongo import MongoClient
+from collections.abc import Iterable
+import warnings
+import os
+#os.environ["PATH"] += os.pathsep + 'path/to/dir/containing/geckodriver/'
+
+#------ get data with json object ----------
+response1 = requests.get("https://quotes.rest/qod.json")
+response1 = response1.json()
+text_json_format=json.dumps(response1,indent=4)
+qoute=response1['contents']['quotes'][0]
+
+#------- scrabing data from the web -----------
+
+
+response = requests.get('https://en.wikipedia.org/wiki/Natural_language_processing')
+# print(response)
+print(response.status_code)
+
+html_doc = response.text
+
+ # Parsing data
+soup = BeautifulSoup(html_doc, 'html.parser')
+
+# Formating the parsed html file
+strhtm = soup.prettify()
+# get all the pragraph text from p tage
+pragraph =""
+all_P_tag_object=soup.find_all("p")
+for x in all_P_tag_object:
+    y=x.string
+    pragraph+=str(y)
+#------clean data with regex module -------
+paragraph=str(re.findall('[^(No|ne):.-]',pragraph))
+
+#------ scrabing data with selenium --------
+
+client = MongoClient()
+DB_NAME = 'elmenus'
+#Create database 
+db = client[DB_NAME]
+
+elmenus_collection = db['data']
+
+cur_path = os.getcwd()
+# print(cur_path)
+
+selenium_driver_path = "/homeahmed-adel/anaconda3/pkgs/selenium-3.141.0-py37h7b6447c_0/lib/python3.7/site-packages/selenium/webdriver/chrome"
+
+#---------- Helper functions --------------
+# get unique elements from a list
+def unique(data):
+    return list(dict.fromkeys(data))
+
+
+# get selenium driver object
+def get_selenium_driver():
+    """
+    This function returns the selenium driver object.
+
+    Parameters:
+        None
+
+    Returns:
+        driver: selenium driver object
+    """
+    options = webdriver.FirefoxOptions()
+#     options.add_argument('-headless')
+
+    driver = webdriver.Firefox(executable_path = selenium_driver_path, options = options)
+
+    return driver
+
+
+# get BeautifulSoup object
+def get_soup(url):
+    """
+    Given the url of a page, this function returns the soup object.
+    
+    Parameters:
+        url: the link to get soup object for
+    
+    Returns:
+        soup: soup object
+    """
+    driver = get_selenium_driver()
+
+    driver.get(url)
+    driver.implicitly_wait(3)
+
+    html = driver.page_source
+    soup = BeautifulSoup(html, 'html.parser')
+
+    driver.close()
+
+    return soup
+
+
+#save to MongoDB
+def saveToDB(collection, city_areas_zones_dict):
+    
+    try:
+        print("collection.count_documents({}): ",  collection.count_documents({}))
+        resultSet = collection.count_documents({"City":city_areas_zones_dict["City"],"Areas_Zones":city_areas_zones_dict['Areas_Zones']})
+
+        if resultSet > 0:
+            print("city_areas_zones_dict is already scrapped >> ", city_areas_zones_dict)
+            print("Skip!")
+        else:
+            print("New city_areas_zones_dict will be scrapped >> ", city_areas_zones_dict)
+            print("I will insert it!")
+            collection.insert_one(city_areas_zones_dict)
+            
+    except Exception as e:
+        print('Exception : %s' % str(e))
+        
+# scrape elmenus website
+
+def scrape_elmenus():
+    base_url = 'https://www.elmenus.com'
+    # uniqueJobs = requests.get(base_url).json()
+    
+    # get a soup object for elmenus home page
+    home_page_soup = get_soup(base_url)
+    
+    # get all cities' names
+    dropdown_menu_ul = home_page_soup.find("ul",{"class":"dropdown-menu inner"})
+    cities_names = []
+    
+    for li in dropdown_menu_ul:
+        cities_names.append(li.text.strip())
+    print("Number of Cities: ", len(cities_names))
+    print("Cities: ", cities_names)
+    cities_num = len(cities_names)
+
+    # get a get_selenium_driver object
+    driver = get_selenium_driver()
+    
+    # request the delivery base url using selenium
+    base_url = "https://www.elmenus.com/cairo/delivery"
+    driver.get(base_url)
+    
+    header_div = driver.find_element_by_class_name('area-zone-content')
+    header_div_soup = header_div.get_attribute('innerHTML')
+    # cities_list_ul =  driver.find_elements_by_class_name("zone-btn")
+    # cities_names = [ city.text.strip() for city in cities_list_ul]
+
+    city_areas_zones_dict = {}
+
+    for city_index,city_name in enumerate(cities_names):
+        print("Current City Name: ", city_name)
+
+        city_css_selector = '#cities-list > li:nth-child('+ str(city_index+1) +') > button'
+        # print("city_css_selector: ", city_css_selector)
+        city_button = driver.find_elements_by_css_selector(city_css_selector)
+        city_button = city_button[0]
+        driver.execute_script("arguments[0].click();",city_button)
+        driver.implicitly_wait(3)
+
+        areas_list_buttons =  driver.find_elements_by_class_name("area-btn")
+        areas_names = [ area.text.replace("AS","").strip() for area in areas_list_buttons]
+        areas_names = [area for area in areas_names if area != '']
+        areas_num = len(areas_names)
+        print("Areas: ", areas_names)
+
+        areas_zones_dict = {}
+
+        for area_index in range(1, areas_num + 1 ):
+            area = areas_list_buttons[area_index-1] 
+            area_name = areas_names[area_index-1]
+            print(">>> Current Area Name: ", area_name)
+
+            area_button = areas_list_buttons[area_index-1]
+            # area_button.click()
+            driver.execute_script("arguments[0].click();",area_button)
+            driver.implicitly_wait(3)
+            time.sleep(1)
+
+            zones_list =  driver.find_elements_by_class_name("city-area-zone")
+            zones_names = [ zone.text.strip() for zone in zones_list]
+            zones_names = [zone for zone in zones_names if zone != '']
+            print(">>>>>> zones_names: ", zones_names)
+            areas_zones_dict[area_name] = zones_names
+            
+        city_areas_zones_dict["_id"] = str(city_index)
+        city_areas_zones_dict["City"] = city_name
+        city_areas_zones_dict["Areas_Zones"] = areas_zones_dict
+
+        print("city_areas_zones_dict: ", city_areas_zones_dict)
+        
+        # save the city_areas_zones_dict into MongoDB elmenus_collection
+        saveToDB(elmenus_collection, city_areas_zones_dict)
+
+        time.sleep(3)
+        print("----------------------------------")
+
+    driver.close()
+scrape_elmenus()
+
+# generate_csv_file from elmenus_collection
+
+def generate_csv_file():
+    
+    cursor = elmenus_collection.find({})
+    df =  pd.DataFrame(list(cursor))
+    print(df.head())
+    df.to_csv('elmenus_data.csv')
+
+generate_csv_file()
+
+
+
+
+from selenium import webdriver
+ 
+browser = webdriver.Firefox()
+browser.get('http://www.ubuntu.com/')
+
+
+
+
+
+
+
+
+
+
