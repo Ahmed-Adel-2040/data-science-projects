@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Feb 25 13:00:34 2020
+
+@author: ahmed-adel
+"""
+
+from selenium import webdriver
+from pymongo import MongoClient
+import time
+
+
+client = MongoClient()
+DB_NAME = 'udemy'
+db = client[DB_NAME]
+Development = db['development']
+
+Names=[]
+descriptions=[]
+what_Learns=[]
+tools=[]
+Instructors_Notes=[]
+number_Of_Lectures=[]
+level_Of_Course=[]
+number_Of_Hours=[]
+Rates=[]
+hints=[]
+Meta_Data=[]
+last_Updates=[]
+Requirments=[]
+urlList=[]
+student_Num=[]
+lectuer_index=[0,3,6,9,12,15,18,21,24,27,30,33,36,39,42,45]
+hours_index=[1,4,7,10,13,16,19,22,25,28,31,34,37,40,43,46]
+level_index=[2,5,8,11,14,17,20,23,26,29,32,35,38,41,44,47]
+image_Index=[1,2,3,4,6,7,8,9,10,11,12,13,14,15,16,17]
+
+def get_Driver():
+    return webdriver.Firefox();
+
+def get_Data(driver):
+    
+    for x in range(1,626):
+        URL='https://www.udemy.com/courses/development/?p='+x
+        driver.get(URL)
+        meta_Data=driver.find_elements_by_xpath("//span[contains(@class, 'list-view-course-card--meta-item--1Pyfe')]")
+    
+        for element in meta_Data:
+            Meta_Data.append(element.text)
+        global number_Of_Hours,level_Of_Course,number_Of_Lectures
+        number_Of_Lectures=[Meta_Data[i] for i in lectuer_index]
+        number_Of_Hours=[Meta_Data[i] for i in hours_index]
+        level_Of_Course=[Meta_Data[i] for i in level_index]
+
+   
+        # the herf with specfic class
+        div = driver.find_elements_by_class_name('list-view-course-card--course-card-wrapper--TJ6ET')
+
+        for element in div:
+            urlList.append(element.find_element_by_css_selector('a').get_attribute('href'))
+        
+        for url in urlList:
+            driver.get(url)        
+            Name=driver.find_element_by_xpath("//h1[contains(@class, 'clp-lead__title ')]").text
+            Names.append(Name)
+            small_hit=driver.find_element_by_xpath("//div[contains(@class, 'clp-lead__headline')]").text
+            hints.append(small_hit)
+            rate=driver.find_element_by_xpath("//span[contains(@class, 'udlite-heading-sm star-rating--rating-number--3lVe8')]").text
+            Rates.append(rate)
+            Num_Of_Student=driver.find_element_by_xpath("/html/body/div[1]/div[3]/div/div[2]/div[4]/div/div[1]/div[2]/div/div[2]/div").text
+            student_Num.append(Num_Of_Student)
+            
+            last_Update=driver.find_element_by_xpath('/html/body/div[1]/div[3]/div/div[2]/div[4]/div/div[1]/div[3]/div[2]/div/div/span[2]').text
+            last_Updates.append(last_Update)
+            element_whate_learn= driver.find_elements_by_xpath("//ul[contains(@class, 'what-you-get__items ')]")
+            whate_learn=''
+            for i in element_whate_learn:
+                whate_learn=whate_learn+i.text+','
+            what_Learns.append(whate_learn)
+    
+            driver.find_element_by_xpath("//a[contains(@class, 'section-container section-container--more-sections')]").click()
+            element_tool=driver.find_elements_by_xpath("//span[contains(@class, 'section-title-text')]")
+            tool=''
+            for x in element_tool:
+                tool=tool+x.text+','
+            tools.append(tool)
+   
+            Requirment=driver.find_element_by_xpath("//ul[contains(@class, 'requirements__list')]").text
+            Requirments.append(Requirment)
+            Description_Text=driver.find_elements_by_xpath("//p")
+            paragraph=''
+            for x in Description_Text:
+                paragraph=paragraph+x.text
+            descriptions.append(paragraph)
+            instracutor_Note=driver.find_element_by_xpath('/html/body/div[1]/div[3]/div/div[14]/div/div/div/div/div/div/div[3]').text
+            Instructors_Notes.append(instracutor_Note)
+        for element in Names:
+            with open(element+'.png', 'wb') as file:
+                file.write(driver.find_element_by_xpath('/html/body/div[2]/div[3]/div/div/div[5]/div[2]/div[2]/div/a/div/div[1]/img').screenshot_as_png)
+        save_To_Mongo()
+
+
+#driver.find_element_by_xpath("//span[contains(@class, 'pagination-next udi udi-next')]").click()
+
+
+def save_To_Mongo(): 
+    for i in range(16):
+        Course={
+            'Course_Name':Names[i],
+            'Course_Rate':Rates[i],
+            'Course_Description':descriptions[i],
+            'Lectures_Num':number_Of_Lectures[i],
+            'Course_Level':level_Of_Course[i],
+            'Course_hours':number_Of_Hours[i],
+            'Course_Url':urlList[i],
+            'Last_Update':last_Updates[i],
+            'Requirment':Requirments[i],
+            'Tools':tools[i],
+            'Whats_Learn':what_Learns[i],
+            'Insrauctor_Note':Instructors_Notes[i],
+            'Student_Number':student_Num[i]
+            
+            
+            }
+        Development.insert_one(Course)
+    print("Data Saved in Mongo DB")
+    Names.clear()
+    Rates.clear()
+    descriptions.clear()
+    urlList.clear()
+    last_Updates.clear()
+    what_Learns.clear()
+    Requirments.clear()
+    student_Num.clear()
+    Instructors_Notes.clear()
+    number_Of_Lectures.clear()
+    level_Of_Course.clear()
+    number_Of_Hours.clear()
+    Meta_Data.clear()
+
+
+/html/body/div[2]/div[3]/div/div/div[5]/div[2]/div[1]/div/a/div/div[1]/img
+/html/body/div[2]/div[3]/div/div/div[5]/div[2]/div[2]/div/a/div/div[1]/img
