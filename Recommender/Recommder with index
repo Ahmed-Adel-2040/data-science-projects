@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Feb 24 23:09:39 2020
+
+@author: ahmed-adel
+"""
+
+# import the nccssary librarya 
+from elasticsearch import Elasticsearch
+from elasticsearch.helpers import bulk
+from pymongo import MongoClient
+import pandas as pd
+import pymongo
+import time
+from pymongo import IndexModel ,ASCENDING,DESCENDING
+
+client = MongoClient()
+Udemy_DB = client['udemy']
+Development_Collection = Udemy_DB['development_cleaned']
+
+def create_Mongo_index():
+    index1=IndexModel([('Course_Description',ASCENDING)],name='search1')
+    index2=IndexModel([('Course_Name',ASCENDING)],name='search2')
+    Udemy_DB.Development_Collection.create_indexes([index1,index2])
+def create_elastic_search():
+    es = Elasticsearch([{'host': 'localhost', 'port': 9200}])
+    # index settings
+    settings = {
+    "settings": {
+        "number_of_shards": 1,
+        "number_of_replicas": 0
+        },
+            "mappings": {
+                    "properties": {
+                            'Course_Description': {'type': 'text'},
+                            'Course_Name' : {'type': 'text'},
+                            'Number_Rates' : {'type': 'text'}
+                        }}}              # create index
+    es.indices.create(index="Course", ignore=400, body=settings)
+
+
+def search_with_index(collName,word):
+    start_time = time.time()
+    result = pd.DataFrame(Development_Collection.find({collName: {'$regex':word}}))
+    end_time = time.time()
+    search_time_before_indexing = end_time - start_time
+    print ('Search Time after Indexing in s: ', search_time_before_indexing)
+    return result
+
+def recommender_function(dataframe,word):
+    weight=[]
+    for row in dataframe.iterrows():
+        weight.append(str(row).count('python'))
+    dataframe['weight']=weight
+    dataframe.sort_values(['weight','Number_Rates'],ascending=[False,False])
+    resulat=dataframe.head()
+    del dataframe['weight']
+    return resulat
+    
+    
+    
+    
+    
+    
