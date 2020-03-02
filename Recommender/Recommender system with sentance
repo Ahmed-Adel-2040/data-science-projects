@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Mar  2 22:00:46 2020
+
+@author: ahmed-adel
+"""
+
+import tensorflow as tf
+import tensorflow_hub as hub
+import pandas as pd
+from sklearn.metrics.pairwise import cosine_similarity
+
+module_url = "https://tfhub.dev/google/universal-sentence-encoder/4"
+model = hub.load(module_url)
+print ("module %s loaded" % module_url)
+ 
+df=pd.read_csv('udemy_cleaned data2.csv')
+
+
+def embed(input):
+  return model(input)
+
+def concat_Dataframe_Col(df,colNames=[]):
+    """
+    this function take dataframe and all columns name in
+    colNames list which we want to concat to make 
+    embeddig fot it 
+    Then return this column
+    
+    """
+    df['search'] = df[colNames].apply(lambda x: ' '.join(x), axis=1)
+    return df['search']
+
+
+
+ 
+def cos_sim(context_Column,word):
+    
+    input_vectors=embed(context_Column)
+    input2=embed(word)
+    similarity = cosine_similarity(input_vectors,input2)
+    return similarity
+def get_most_relevant(context_Column,word):
+    result=cos_sim(context_Column,word)
+
+    max_sim=result.max()
+
+    result_list=result.tolist()
+    most_sim_index = result_list.index(max_sim)
+
+    return df.iloc[most_sim_index]
+
+
+
+colNames=['Course_Name','Course_Description']
+context_Column=concat_Dataframe_Col(df,colNames)
+word='data science python'
+
+most_similar=get_most_relevant(context_Column,word)
+
+
+
+
+
+
