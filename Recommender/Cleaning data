@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Feb 11 12:06:04 2020
+
+@author: ahmed-adel
+"""
+
+import pandas as pd
+import nltk.corpus as corpus
+from textblob import TextBlob
+from nltk.stem import PorterStemmer
+import re
+
+
+
+
+def clean_Data(dataFrame,colName):
+#    if type(dataFrame).__name__!= 'DataFrame' | type(colName).__name__!='str':
+#        print('prarmeter type error ')
+#        return
+    #remove punctuation
+    dataFrame[colName]= dataFrame[colName].apply(lambda word: re.sub(r'[0-9]','',re.sub(r'[^\w\s]','',word)))
+      #lower the wordes
+    dataFrame[colName] = dataFrame[colName] .apply(lambda text: " ".join(word.lower() for word in text.split()))
+   
+    
+    # correct the spelling
+    dataFrame[colName]=dataFrame[colName].apply(lambda x: str(TextBlob(x).correct()))
+    #remove stop words
+    stop = corpus.stopwords.words('english')
+    dataFrame[colName]=dataFrame[colName] = dataFrame[colName].apply(lambda x: " ".join(x for x in x.split() if x not in stop))
+    porterStemmer = PorterStemmer()
+    dataFrame[colName]=dataFrame[colName].apply(lambda x: " ".join([porterStemmer.stem(word) for word in x.split()]))
+    return dataFrame
+
+
+dataFrame=pd.read_csv('udemy.csv')
+colName='Course_Name'
+
+clean_Frame2=clean_Data(dataFrame,colName)
+##saveing clean data
+#clean_Frame2.to_csv('udemy clean data.csv')
+
